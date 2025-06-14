@@ -19,6 +19,7 @@ page = st.sidebar.radio("Go to", ["📤 Upload CSV", "📊 Dashboard", "📈 SKU
 
 # ------------------ Upload Page ------------------
 def upload_page():
+    st.title("AI Inventory Optimizer")
     st.title("📤 Upload Your Inventory CSV")
     st.markdown("Upload your inventory dataset to generate AI-powered forecasts and alerts.")
     uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
