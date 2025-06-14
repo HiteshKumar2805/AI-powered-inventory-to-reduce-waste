@@ -1,10 +1,24 @@
 import pandas as pd
 from prophet import Prophet
 import logging
+import holidays
 
+# -------------------------------
+# Logging Setup
+# -------------------------------
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# -------------------------------
+# Holiday Regressor Helper
+# -------------------------------
+def is_indian_holiday(date):
+    india_holidays = holidays.CountryHoliday("IN")
+    return int(date in india_holidays)
+
+# -------------------------------
+# Demand Forecast Function
+# -------------------------------
 def forecast_demand(df: pd.DataFrame) -> pd.DataFrame:
     result_frames = []
 
@@ -17,11 +31,13 @@ def forecast_demand(df: pd.DataFrame) -> pd.DataFrame:
     for sku in df["sku"].unique():
         logger.info(f"📊 Forecasting for SKU: {sku}")
 
-        sku_df = df[df["sku"] == sku]
+        sku_df = df[df["sku"] == sku].copy()
+        sku_df["is_holiday"] = sku_df["date"].apply(is_indian_holiday)
 
-        # Prophet needs 'ds' and 'y' columns
         try:
-            sales_df = sku_df[["date", "sales"]].rename(columns={"date": "ds", "sales": "y"})
+            sales_df = sku_df[["date", "sales", "is_holiday"]].rename(columns={
+                "date": "ds", "sales": "y"
+            })
         except KeyError as ke:
             logger.error(f"⚠️ Missing required columns in input data: {ke}")
             continue
@@ -32,12 +48,16 @@ def forecast_demand(df: pd.DataFrame) -> pd.DataFrame:
 
         try:
             model = Prophet(daily_seasonality=True)
+            model.add_regressor("is_holiday")
             model.fit(sales_df)
 
             future = model.make_future_dataframe(periods=7)
-            forecast = model.predict(future)
+            future["is_holiday"] = future["ds"].apply(is_indian_holiday)
 
-            forecast_result = forecast[["ds", "yhat"]].rename(columns={"ds": "date", "yhat": "prediction"})
+            forecast = model.predict(future)
+            forecast_result = forecast[["ds", "yhat"]].rename(columns={
+                "ds": "date", "yhat": "prediction"
+            })
             forecast_result["sku"] = sku
             result_frames.append(forecast_result)
 
